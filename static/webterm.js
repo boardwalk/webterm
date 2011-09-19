@@ -27,6 +27,14 @@ function clamp(i, lowerBound, upperBound) {
   return i;
 }
 
+function max(a, b) {
+  return a > b ? a : b;
+}
+
+function min(a, b) {
+  return a < b ? a : b;
+}
+
 function Terminal() {
   var canvas = document.getElementById("terminal");
   var ctx = canvas.getContext("2d");
@@ -149,6 +157,20 @@ function Terminal() {
     colors.push(level);
   }
 
+  // reverse variants
+  var reverseColors = {};
+  for(i in colors) {
+    var intVal = parseInt(colors[i].substr(1), 16);
+    var red = intVal >> 16;
+    var green = (intVal >> 8) & 0xFF;
+    var blue = intVal & 0xFF;
+    var color = "#" +
+      toHex(255 - red) +
+      toHex(255 - green) +
+      toHex(255 - blue);
+    reverseColors[colors[i]] = color;
+  }
+
   /**********************************************
    * Terminal state
    **********************************************/
@@ -166,7 +188,7 @@ function Terminal() {
     bright: false,
     underscore: false,
     blink: false,
-    hidden: false,
+    reverse: false,
     foregroundColor: colors[7],
     backgroundColor: colors[0]
   };
@@ -176,6 +198,9 @@ function Terminal() {
   var originalCurRow = 0;
   var originalCurCol = 0;
 
+  // Used by \e7 and \e8 to save and restore cursor position
+  var savedCurRow = 0;
+  var savedCurCol = 0;
 
   function inScrollingRegion() {
     return curRow >= scrollTop && curRow < scrollBottom;
@@ -231,6 +256,32 @@ function Terminal() {
     }
   }
 
+  function scrollUp(amount) {
+    if(amount <= 0)
+      return;
+    ctx.fillStyle = displayAttribs.backgroundColor;
+    while(amount > 0) {
+      lazyScrollCount = (lazyScrollCount + 1) % (scrollBottom - scrollTop);
+      ctx.fillRect(0, translateRow(scrollBottom - 1) * charHeight, canvas.width, charHeight);
+      amount--;
+    }
+    lazyScroll();
+  }
+
+  function scrollDown(amount) {
+    if(amount <= 0)
+      return;
+    ctx.fillStyle = displayAttribs.backgroundColor;
+    while(amount > 0) {
+      lazyScrollCount--;
+      if(lazyScrollCount < 0)
+        lazyScrollCount += (scrollBottom - scrollTop);
+      ctx.fillRect(0, translateRow(scrollTop) * charHeight, canvas.width, charHeight);
+      amount--;
+    }
+    lazyScroll();
+  }
+
   function hideCursor(text, textIndex) {
     if(!modes[25])
       return;
@@ -268,15 +319,30 @@ function Terminal() {
 
   function render(ch) {
     var r = translateRow(curRow);
-    ctx.fillStyle = displayAttribs.backgroundColor;
+    var bg = displayAttribs.backgroundColor;
+    var fg = displayAttribs.foregroundColor;
+    if(displayAttribs.reverse) {
+      bg = reverseColors[bg];
+      fg = reverseColors[fg];
+    }
+    ctx.fillStyle = bg;
     ctx.fillRect(curCol * charWidth, r * charHeight, charWidth, charHeight);
-    ctx.fillStyle = displayAttribs.foregroundColor;
+    ctx.fillStyle = fg;
     ctx.fillText(ch, curCol * charWidth + 3, (r + 1) * charHeight - 4);
   }
 
   /**********************************************
    * Escape sequences
    **********************************************/
+  function getInt(args, i) {
+    if(args && args.length != 0) {
+      i = parseInt(args);
+      if(isNaN(i)) throw "Invalid integer format";
+      if(i < 0) throw "Negative integer";
+    }
+    return i;
+  }
+
   function csi(command) {
     var type = command[command.length - 1];
     var args = command.substr(0, command.length - 1);
@@ -284,17 +350,11 @@ function Terminal() {
 //      console.log(type);
     if(type == "@") { // ICH -- Insert Character
       if(!inScrollingRegion()) return;
-      var amount = 1;
-      if(args.length != 0) {
-        amount = parseInt(args);
-        if(isNaN(amount)) return;
-      }
-      if(amount > numCols - curCol)
-        amount = numCols - curCol;
+      var amount = min(getInt(args, 1), numCols - curCol);
       move(curRow, curCol, curRow + 1, numCols, curRow, curCol + amount);
       clear(curRow, curCol, curRow + 1, curCol + amount);
     }
-    else if(type == "m") { // SGR
+    else if(type == "m") { // SGR -- Select Graphic Rendition
       var attribs = [0];
       if(args.length != 0) {
         attribs = args.split(';');
@@ -309,15 +369,12 @@ function Terminal() {
             displayAttribs.bright = false;
             displayAttribs.underscore = false;
             displayAttribs.blink = false;
-            displayAttribs.hidden = false;
+            displayAttribs.reverse = false;
             displayAttribs.foregroundColor = colors[7]
             displayAttribs.backgroundColor = colors[0];
             break;
           case 1:
             displayAttribs.bright = true;
-            break;
-          case 2:
-            displayAttribs.bright = false;
             break;
           case 4:
             displayAttribs.underscore = true;
@@ -325,11 +382,8 @@ function Terminal() {
           case 5:
             displayAttribs.blink = true;
             break;
-          case 6:
-            displayAttribs.reverse = true;
-            break;
           case 7:
-            displayAttribs.hidden = true;
+            displayAttribs.reverse = true;
             break;
           case 30: case 31: case 32: case 33: case 34: case 35: case 36: case 37:
             var colorNum = attribs[attribNum] - 30;
@@ -394,12 +448,7 @@ function Terminal() {
         console.log("Unhandled DECSEL");
       }
       else { // EL -- Erase in Line
-        var mode = 0;
-        if(args.length != 0) {
-          mode = parseInt(args);
-          if(isNaN(mode)) return;
-        }
-        ctx.fillStyle = displayAttribs.backgroundColor;
+        var mode = getInt(args, 0);
         if(mode == 0)  // clear right
           clear(curRow, curCol, curRow + 1, numCols);
         else if(mode == 1)  // clear left
@@ -409,77 +458,49 @@ function Terminal() {
       }
     }
     else if(type == "P") { // DCH -- Delete Character
-      var amount = 1;
-      if(args.length != 0) {
-        amount = parseInt(args);
-        if(isNaN(amount))
-          return;
-      }
-      if(amount > numCols - curCol)
-        amount = numCols - curCol;
+      var amount = min(getInt(args, 1), numCols - curCol);
       move(curRow, curCol + amount, curRow + 1, numCols, curRow, curCol);
       clear(curRow, numCols - amount, curRow + 1, numCols);
     }
-    else if(type == "A") { // CUU
-      var amount = 1;
-      if(args.length != 0) {
-        amount = parseInt(args);
-        if(isNaN(amount)) return;
-      }
-      curRow = clamp(curRow - amount, 0, numRows - 1);
+    else if(type == "A") { // CUU -- CUrsor Up
+      curRow = max(curRow - getInt(args, 1), 0);
     }
-    else if(type == "B") { // CUD
-      var amount = 1;
-      if(args.length != 0) {
-        amount = parseInt(args);
-        if(isNaN(amount)) return;
-      }
-      curRow = clamp(curRow + amount, 0, numRows - 1);
+    else if(type == "B") { // CUD -- CUrsor Down
+      curRow = min(curRow + getInt(args, 1), numRows - 1);
     }
-    else if(type == "C") { // CUF
-      var amount = 1;
-      if(args.length != 0) {
-        amount = parseInt(args);
-        if(isNaN(amount)) return;
-      }
-      curCol = clamp(curCol + amount, 0, numCols - 1);
+    else if(type == "C") { // CUF -- CUrsor Forward
+      curCol = min(curCol + getInt(args, 1), numCols - 1);
     }
-    else if(type == "D") { // CUB
-      var amount = 1;
-      if(args.length != 0) {
-        amount = parseInt(args);
-        if(isNaN(amount)) return;
-      }
-      curCol = clamp(curCol - amount, 0, numCols - 1);
+    else if(type == "D") { // CUB -- CUrsor Back
+      curCol = max(curCol - getInt(args, 1), 0);
     }
-    else if(type == "H") { // CUP
-      var coords = [1, 1];
-      if(args.length != 0) {
-        coords = args.split(";");
-        if(coords.length != 2) return;
-        for(coordNum in coords) {
-          coords[coordNum] = parseInt(coords[coordNum]);
-          if(isNaN(coords[coordNum])) return;
-        }
-      }
-      curRow = clamp(coords[0], 1, numRows) - 1;
-      curCol = clamp(coords[1], 1, numCols) - 1;
+    else if(type == "E") { // CNL -- Cursor Next Line
+      curRow = min(curRow + getInt(args, 1), numRows - 1);
+      curCol = 0;
     }
-    else if(type == "J") { // ED
-      var mode = 0;
-      if(args.length != 0) {
-        mode = parseInt(args);
-        if(isNaN(mode)) return;
-      }
+    else if(type == "F") { // CPL -- Cursor Previous Line
+      curRow = max(curRow - getInt(args, 1), 0);
+      curCol = 0;
+    }
+    else if(type == "G") { // CHA -- Cursor Horizontal Absolute
+      curCol = clamp(getInt(args, 1), 1, numCols) - 1;
+    }
+    else if(type == "H") { // CUP -- Cursor Position
+      var coords = args.split(";");
+      curRow = clamp(getInt(coords[0], 1), 1, numRows) - 1;
+      curCol = clamp(getInt(coords[1], 1), 1, numCols) - 1;
+    }
+    else if(type == "J") { // ED -- Erase in Display
+      var mode = getInt(args, 0);
       if(mode == 0) { // below
         clear(curRow, curCol, curRow + 1, numCols); // current line
         if(curRow + 1 < numRows)
           clear(curRow + 1, 0, numRows, numCols); // everything below
       }
       else if(mode == 1) { // above
+        clear(curRow, 0, curRow + 1, numCols); // current line
         if(curRow > 0)
           clear(0, 0, curRow, numCols); // everything above
-        clear(curRow, 0, curRow + 1, numCols); // current line
       }
       else if(mode == 2) { // all
         clear(0, 0, numRows, numCols);
@@ -489,22 +510,22 @@ function Terminal() {
       }
     }
     else if(type == "L") { // IL -- Insert Line
-      var amount = 1;
-      if(args.length != 0) {
-        amount = parseInt(args);
-        if(isNaN(amount)) return;
-      }
+      // TODO LOOK AT ME
+      var amount = getInt(args, 1);
       move(curRow, 0, scrollBottom - amount, numCols, curRow + amount, 0);
       clear(curRow, 0, curRow + amount, numCols);
     }
     else if(type == "M") { // DL -- Delete Line
-      var amount = 1;
-      if(args.length != 0) {
-        amount = parseInt(args);
-        if(isNaN(amount)) return;
-      }
+      // TODO LOOK AT ME
+      var amount = getInt(args, 1);
       move(curRow + amount, 0, scrollBottom, numCols, curRow, 0);
       clear(scrollBottom - amount, 0, scrollBottom, numCols);
+    }
+    else if(type == "S") { // SU -- Scroll Up
+      scrollUp(getInt(args, 1));
+    }
+    else if(type == "T") { // SD -- Scroll Down
+      scrollDown(getInt(args, 1));
     }
     else if(type == "c") { // DA -- Device attributes
       if(args[0] == ">") {
@@ -516,12 +537,7 @@ function Terminal() {
       }
     }
     else if(type == "d") { // VPA -- Vertical Position Absolute
-      var col = 1;
-      if(args.length != 0) {
-        col = parseInt(args);
-        if(isNaN(col)) return;
-      }
-      curCol = clamp(col, 1, numCols) - 1;
+      curRow = clamp(getInt(args, 1), 1, numRows) - 1;
     }
     else if(type == "h") { // DECSET, SM
       var isDecset = (args[0] == "?");
@@ -586,26 +602,14 @@ function Terminal() {
       }
     }
     else if(type == "r") { // DECSTBM
-      var lines = [];
-      if(args.length != 0) {
-        lines = args.split(";");
-        for(lineNum in lines) {
-          lines[lineNum] = parseInt(lines[lineNum]);
-          if(isNaN(lines[lineNum])) return;
-        }
-      }
       lazyScroll(true); // Important!
-      curCol = 0;
       curRow = 0;
-      if(lines.length < 1)
-        scrollTop = 0;
-      else
-        scrollTop = lines[0] - 1;
-      if(lines.length < 2)
-        scrollBottom = numRows;
-      else
-        scrollBottom = lines[1];
-      //console.log("Scroll region is now " + scrollTop + ", " + scrollBottom);
+      curCol = 0;
+      var bounds = args.split(";");
+      scrollTop = clamp(getInt(bounds[0], 1), 1, numRows) - 1;
+      scrollBottom = clamp(getInt(bounds[1], numRows), 1, numRows);
+      if(scrollTop > scrollBottom)
+        throw "Bad scrolling region set";
     }
     else {
       console.log("Unhandled CSI escape sequence: " + command);
@@ -618,8 +622,12 @@ function Terminal() {
       if(args.length == 2)
         document.title = args[1];
     }
+    else if(args[0] == "2") {
+      if(args.length == 2)
+        document.title = args[1];
+    }
     else {
-      console.log("unhandled osc");
+      console.log("unhandled osc: " + args[0]);
     }
   }
 
@@ -639,6 +647,23 @@ function Terminal() {
 
     if(text[textIndex] == "M") {
       console.log("Reverse Index");
+      return textIndex + 1;
+    }
+
+    if(text[textIndex] == "(") {
+      // Change character set -- we don't really care.
+      return textIndex += 2;
+    }
+
+    if(text[textIndex] == "7") {
+      savedCurRow = curRow;
+      savedCurCol = curCol;
+      return textIndex + 1;
+    }
+
+    if(text[textIndex] == "8") {
+      curRow = savedCurRow;
+      curCol = savedCurCol;
       return textIndex + 1;
     }
 
