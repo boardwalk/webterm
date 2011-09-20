@@ -710,7 +710,6 @@ function Terminal() {
         curCol = 0;
       }
       else if(ch == "\n") { // newline
-        curCol = 0;
         curRow++;
         scroll();
       }
@@ -784,6 +783,14 @@ function Terminal() {
     }
     if(e.ctrlKey && e.keyCode >= 65 && e.keyCode <= 90) { // ctrl-alpha
       socket.send(String.fromCharCode(e.keyCode - 64));
+      return false;
+    }
+    if(e.altKey && e.keyCode >= 65 && e.keyCode <= 90) { // alt-alpha
+      socket.send("\u001b" + String.fromCharCode(e.keyCode));
+      return false;
+    }
+    if(e.ctrlKey && e.keyCode == 32) { // alt-space
+      socket.send("\u001b@");
       return false;
     }
     return true;
