@@ -531,7 +531,7 @@ function Terminal() {
     else if(type == "c") { // DA -- Device attributes
       if(args[0] == ">") {
         console.log("Secondary device attributes");
-        socket.send("\u001b[0;95;9c");
+        socket.send("\u001b[>0;136;0c");
       }
       else {
         console.log("Primary device attributes not supported");
@@ -541,6 +541,7 @@ function Terminal() {
       curRow = clamp(getInt(args, 1), 1, numRows) - 1;
     }
     else if(type == "h") { // DECSET, SM
+      // TODO DECSET, SM are not the same. xterm does not respond to them the same
       // TODO multiple values?
       var isDecset = (args[0] == "?");
       if(isDecset) args = args.substr(1);
@@ -559,6 +560,9 @@ function Terminal() {
       }
       else if(modeNum == 1000) {
         console.log("Enable mouse");
+      }
+      else if(modeNum == 1002) {
+        console.log("Enable mouse with cell motion tracking");
       }
       else if(modeNum == 1049) {
         console.log("Use alternate screen buffer");
@@ -588,6 +592,9 @@ function Terminal() {
       }
       else if(modeNum == 1000) {
         console.log("Disable mouse");
+      }
+      else if(modeNum == 1002) {
+        console.log("Disable mouse with cell motion tracking");
       }
       else if(modeNum == 1049) {
         console.log("Use original screen buffer");
@@ -745,33 +752,44 @@ function Terminal() {
     showCursor();
   } // write()
 
-  function sendMouseEvent(e) {
-    if(!modes[1000])
-      return false;
-
-    var button = 0;
-
-    if(e.button == 0)
-      button += 0;
-    else if(e.button == 1)
-      button += 1;
-    else if(e.button == 2)
-      button += 2;
-    if(e.type == "mouseup")
-      button += 3;
+  function sendMouseEvent(b, e) {
     if(e.shiftKey)
-      button += 4;
+      b += 4;
     if(e.altKey)
-      button += 8;
+      b += 8;
     if(e.ctrlKey)
-      button += 16;
-    // Mouse buttons 3 and 4? How can I trap them?
+      b += 16;
+    var r = 32 + Math.floor(e.offsetY / charHeight) + 1;
+    var c = 32 + Math.floor(e.offsetX / charWidth) + 1;
+    socket.send("\u001b[M" + String.fromCharCode(b) + String.fromCharCode(c) + String.fromCharCode(r));
+  }
 
-    var row = Math.floor(e.offsetY / charHeight) + 33;
-    var col = Math.floor(e.offsetX / charWidth) + 33;
+  function sendMouseButtonEvent(e) {
+    // TODO support motion tracking
+    if(!modes[1000] && !modes[1002])
+      return false;
+    var b = 32;
+    if(e.button == 0)
+      b += 0;
+    else if(e.button == 1)
+      b += 1;
+    else if(e.button == 2)
+      b += 2;
+    if(e.type == "mouseup")
+      b += 3;
+    sendMouseEvent(b, e);
+    return true;
+  }
 
-    socket.send("\u001b[M" + String.fromCharCode(button) + String.fromCharCode(col) + String.fromCharCode(row));
-
+  function sendMouseWheelEvent(e) {
+    if(!modes[1000] && !modes[1002])
+      return false;
+    var b = 32 + 64;
+    if(e.wheelDelta > 0)
+      b += 0;
+    else if(e.wheelDelta < 0)
+      b += 1;
+    sendMouseEvent(b, e);
     return true;
   }
 
@@ -796,8 +814,9 @@ function Terminal() {
     return true;
   };
 
-  canvas.onmousedown = function(e) { return sendMouseEvent(e); }
-  canvas.onmouseup = function(e) { return sendMouseEvent(e); }
+  canvas.onmousedown = function(e) { return sendMouseButtonEvent(e); }
+  canvas.onmouseup = function(e) { return sendMouseButtonEvent(e); }
+  canvas.onmousewheel = function(e) { return sendMouseWheelEvent(e); }
 }
 
 var term = new Terminal();
