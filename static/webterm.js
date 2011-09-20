@@ -179,16 +179,18 @@ function Terminal() {
   var lazyScrollCount = 0;
 
   // Set by SM and DECSET
-  var modes = {
+  var regModes = {};
+  var decModes = {
     25: true // Show cursor on by default
-  };
+  }
 
   // Set by SGR
   var displayAttribs = {
     bright: false,
-    underscore: false,
+    underline: false,
     blink: false,
     reverse: false,
+    hidden: false,
     foregroundColor: colors[7],
     backgroundColor: colors[0]
   };
@@ -283,7 +285,7 @@ function Terminal() {
   }
 
   function hideCursor(text, textIndex) {
-    if(!modes[25])
+    if(!decModes[25])
       return;
     var r = translateRow(curRow);
     if(cursorBacking) {
@@ -293,7 +295,7 @@ function Terminal() {
   }
 
   function showCursor() {
-    if(!modes[25])
+    if(!decModes[25])
       return;
     var r = translateRow(curRow);
     if(!cursorBacking)
@@ -368,9 +370,10 @@ function Terminal() {
         switch(attribs[attribNum]) {
           case 0:
             displayAttribs.bright = false;
-            displayAttribs.underscore = false;
+            displayAttribs.underline = false;
             displayAttribs.blink = false;
             displayAttribs.reverse = false;
+            displayAttribs.hidden = false;
             displayAttribs.foregroundColor = colors[7]
             displayAttribs.backgroundColor = colors[0];
             break;
@@ -378,13 +381,31 @@ function Terminal() {
             displayAttribs.bright = true;
             break;
           case 4:
-            displayAttribs.underscore = true;
+            displayAttribs.underline = true;
             break;
           case 5:
             displayAttribs.blink = true;
             break;
           case 7:
             displayAttribs.reverse = true;
+            break;
+          case 8:
+            displayAttribs.hidden = true;
+            break;
+          case 22:
+            displayAttribs.bright = false;
+            break;
+          case 24:
+            displayAttribs.underscore = false;
+            break;
+          case 25:
+            displayAttribs.blink = false;
+            break;
+          case 27:
+            displayAttribs.reverse = false;
+            break;
+          case 28:
+            displayAttribs.hidden = false;
             break;
           case 30: case 31: case 32: case 33: case 34: case 35: case 36: case 37:
             var colorNum = attribs[attribNum] - 30;
@@ -530,7 +551,8 @@ function Terminal() {
     }
     else if(type == "c") { // DA -- Device attributes
       if(args[0] == ">") {
-        console.log("Secondary device attributes");
+        // Used by PuTTy. Latest xterm is 271. It causes vim to send funky stuff
+        // I don't feel like dealing with right now.
         socket.send("\u001b[>0;136;0c");
       }
       else {
@@ -540,74 +562,67 @@ function Terminal() {
     else if(type == "d") { // VPA -- Vertical Position Absolute
       curRow = clamp(getInt(args, 1), 1, numRows) - 1;
     }
-    else if(type == "h") { // DECSET, SM
-      // TODO DECSET, SM are not the same. xterm does not respond to them the same
-      // TODO multiple values?
-      var isDecset = (args[0] == "?");
-      if(isDecset) args = args.substr(1);
-      var modeNum = parseInt(args);
-      if(isNaN(modeNum)) return;
-      modes[modeNum] = true;
-      if(modeNum == 1) {
-        console.log("Set application cursor keys");
-        setApplicationCursorKeys(true)
+    else if(type == "h") {
+      if(args[0] == "?") { // DECSET
+        //    1 application cursor keys
+        //   12 blinking cursor
+        //   25 show cursor
+        // 1034 set 8 bit input
+        // 1049 alternate screen buffer
+        args = args.substr(1).split(";");
+        for(argNum in args) {
+          var mode = parseInt(args[argNum]);
+          if(isNaN(mode)) return;
+          decModes[mode] = true;
+          if(mode == 1) {
+            setApplicationCursorKeys(true);
+          }
+          else if(mode == 1049) {
+            originalScreen = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            originalCurRow = curRow;
+            originalCurCol = curCol;
+          }
+          //console.log("Set dec mode " + mode);
+        }
       }
-      else if(modeNum == 25) {
-        console.log("Show cursor");
-      }
-      else if(modeNum == 34) {
-        console.log("Set right to left cursor");
-      }
-      else if(modeNum == 1000) {
-        console.log("Enable mouse");
-      }
-      else if(modeNum == 1002) {
-        console.log("Enable mouse with cell motion tracking");
-      }
-      else if(modeNum == 1049) {
-        console.log("Use alternate screen buffer");
-        originalScreen = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        originalCurRow = curRow;
-        originalCurCol = curCol;
-      }
-      else {
-        console.log("SET " + modeNum);
+      else { // SM
+        args = args.split(";");
+        for(argNum in args) {
+          var mode = parseInt(args[argNum]);
+          if(isNaN(mode)) return;
+          regModes[mode] = true;
+          //console.log("Set reg mode " + mode);
+        }
       }
     }
-    else if(type == "l") { // DECRST, RM
-      var isDecset = (args[0] == "?");
-      if(isDecset) args = args.substr(1);
-      var modeNum = parseInt(args);
-      if(isNaN(modeNum)) return;
-      delete modes[modeNum];
-      if(modeNum == 1) {
-        console.log("Unset application cursor keys");
-        setApplicationCursorKeys(false);
+    else if(type == "l") {
+      if(args[0] == "?") { // DECRST
+        args = args.substr(1).split(";");
+        for(argNum in args) {
+          var mode = parseInt(args[argNum]);
+          if(isNaN(mode)) return;
+          delete decModes[mode];
+          if(mode == 1) {
+            setApplicationCursorKeys(false);
+          }
+          else if(mode == 1049) {
+            if(originalScreen)
+              ctx.putImageData(originalScreen, 0, 0);
+            curRow = originalCurRow;
+            curCol = originalCurCol;
+            originalScreen = null;
+          }
+          //console.log("Reset dec mode " + mode);
+        }
       }
-      else if(modeNum == 25) {
-        console.log("Hide cursor");
-      }
-      else if(modeNum == 34) {
-        console.log("Unset right to left cursor");
-      }
-      else if(modeNum == 1000) {
-        console.log("Disable mouse");
-      }
-      else if(modeNum == 1002) {
-        console.log("Disable mouse with cell motion tracking");
-      }
-      else if(modeNum == 1049) {
-        console.log("Use original screen buffer");
-        if(originalScreen)
-          ctx.putImageData(originalScreen, 0, 0);
-        curRow = originalCurRow;
-        curCol = originalCurCol;
-        originalScreen = null;
-        originalCurRow = 0;
-        originalCurCol = 0;
-      }
-      else {
-        console.log("RST " + modeNum);
+      else { // RM
+        args.args.split(";");
+        for(argNum in args) {
+          var mode = parseInt(arg[argNum]);
+          if(isNaN(mode)) return;
+          delete regModes[mode];
+          //console.log("Reset reg mode " + mode);
+        }
       }
     }
     else if(type == "r") { // DECSTBM
@@ -766,7 +781,7 @@ function Terminal() {
 
   function sendMouseButtonEvent(e) {
     // TODO support motion tracking
-    if(!modes[1000] && !modes[1002])
+    if(!decModes[1000] && !decModes[1002])
       return false;
     var b = 32;
     if(e.button == 0)
@@ -782,7 +797,7 @@ function Terminal() {
   }
 
   function sendMouseWheelEvent(e) {
-    if(!modes[1000] && !modes[1002])
+    if(!decModes[1000] && !decModes[1002])
       return false;
     var b = 32 + 64;
     if(e.wheelDelta > 0)
