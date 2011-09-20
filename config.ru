@@ -10,6 +10,7 @@ class TerminalPump < EventMachine::Connection
   def notify_readable
     #puts("#{object_id}#notify_readable")
     data = @io.readpartial(4096)
+    #puts data.inspect
     @app.send_data(data)
   end
   def unbind

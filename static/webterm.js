@@ -346,8 +346,9 @@ function Terminal() {
   function csi(command) {
     var type = command[command.length - 1];
     var args = command.substr(0, command.length - 1);
-//    if(type != "m" && type != "H" && type != "A" && type != "B" && type != "C" && type != "D" && type != "h" && type != "l")
-//      console.log(type);
+//    if(type != "m" && type != "H" && type != "A" && type != "B" && type != "C" && type != "D" && type != "h" && type != "l")a
+//    if(type != "m")
+//      console.log(command);
     if(type == "@") { // ICH -- Insert Character
       if(!inScrollingRegion()) return;
       var amount = min(getInt(args, 1), numCols - curCol);
@@ -540,6 +541,7 @@ function Terminal() {
       curRow = clamp(getInt(args, 1), 1, numRows) - 1;
     }
     else if(type == "h") { // DECSET, SM
+      // TODO multiple values?
       var isDecset = (args[0] == "?");
       if(isDecset) args = args.substr(1);
       var modeNum = parseInt(args);
@@ -652,7 +654,7 @@ function Terminal() {
 
     if(text[textIndex] == "(") {
       // Change character set -- we don't really care.
-      return textIndex += 2;
+      return textIndex + 2;
     }
 
     if(text[textIndex] == "7") {
@@ -719,20 +721,25 @@ function Terminal() {
         if(curCol > 0)
           curCol--;
       }
+      else if(ch == "\u0009") { // tab
+        curCol = min(curCol + (8 - curCol % 8), numCols - 1);
+      }
       else {
         var code = ch.charCodeAt(0);
+        //console.log("char [" + ch + "] code [" + code + "]");
         if(code < 32 || code > 126) {
           console.log("Unknown character code: " + code);
         }
         else {
-          render(ch);
-
-          curCol++;
           if(curCol == numCols) {
             curCol = 0;
             curRow++;
             scroll();
           }
+
+          render(ch);
+
+          curCol++;
         }
       }
     }
