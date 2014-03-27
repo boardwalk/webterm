@@ -35,6 +35,35 @@ function min(a, b) {
   return a < b ? a : b;
 }
 
+function dump(text, i) {
+  if(i === undefined) {
+    i = 0;
+  }
+  while(i < text.length) {
+    var hexPart = "";
+    var asciiPart = "";
+    var j = 0;
+    for(; j < 32; j++) {
+      if(i + j >= text.length)
+        break;
+      var code = text.charCodeAt(i + j);
+      hexPart += code.toString(16) + " ";
+      if(code > 31 && code < 127) {
+        asciiPart += text[i + j];
+      }
+      else {
+        asciiPart += ".";
+      }
+    }
+    for(; j < 32; j++) {
+      hexPart += "   ";
+      asciiPart += " ";
+    }
+    console.log(hexPart + " " + asciiPart);
+    i += 32;
+  }
+}
+
 function Terminal() {
   var canvas = document.getElementById("terminal");
   var ctx = canvas.getContext("2d");
@@ -556,7 +585,12 @@ function Terminal() {
         socket.send("\u001b[>0;136;0c");
       }
       else {
-        console.log("Primary device attributes not supported");
+        if(getInt(args, 0) == 0) {
+          socket.send("\u001b[?1;2c"); // "VT101 with Advanced Video Option"
+        }
+        else {
+          console.log("Unknown primary device attributes arguments");
+        }
       }
     }
     else if(type == "n") { // DSR -- Device Report Status
@@ -661,6 +695,33 @@ function Terminal() {
       if(args.length == 2)
         document.title = args[1];
     }
+    else if(args[0] == "110") {
+      console.log("reset vt100 text foreground color");
+    }
+    else if(args[0] == "111") {
+      console.log("reset vt100 text background color");
+    }
+    else if(args[0] == "112") { // reset text cursor color
+      console.log("reset text cursor color");
+    }
+    else if(args[0] == "113") {
+      console.log("reset mouse foreground color");
+    }
+    else if(args[0] == "114") {
+      console.log("reset mouse background color");
+    }
+    else if(args[0] == "115") {
+      console.log("reset Tektronix foreground color");
+    }
+    else if(args[0] == "116") {
+      console.log("reset Tektronix background color");
+    }
+    else if(args[0] == "117") {
+      console.log("reset highlight color");
+    }
+    else if(args[0] == "118") {
+      console.log("reset Tektronix cursor color");
+    }
     else {
       console.log("unhandled osc: " + args[0]);
     }
@@ -702,7 +763,7 @@ function Terminal() {
       return textIndex + 1;
     }
 
-    if(text[textIndex] == "]") {
+    if(text[textIndex] == "]") { // OSC -- Operating System Controls
       textIndex++;
       var commandLen = text.indexOf("\u0007", textIndex) - textIndex;
       if(commandLen < 0) {
