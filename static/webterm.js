@@ -528,7 +528,7 @@ function Terminal() {
         clear(0, 0, numRows, numCols);
       }
       else {
-        console.log("Unknown ED mode " +mode);
+        console.log("Unknown ED mode " + mode);
       }
     }
     else if(type == "L") { // IL -- Insert Line
@@ -557,6 +557,17 @@ function Terminal() {
       }
       else {
         console.log("Primary device attributes not supported");
+      }
+    }
+    else if(type == "n") { // DSR -- Device Report Status
+      if(args[0] == "5") { // status report
+        socket.send("\u001b[0n"); // SR -- Status Report
+      }
+      else if(args[0] == "6") { // CPR -- Cursor Position Report
+        socket.send("\u001b[" + curRow + ";" + curCol + "R");
+      }
+      else {
+        console.log("Unknown DSR " + args[0]);
       }
     }
     else if(type == "d") { // VPA -- Vertical Position Absolute
