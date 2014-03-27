@@ -150,19 +150,19 @@ function Terminal(socket) {
   var colors = [
     "#000000", // regular 8 color
     "#AA0000", 
-    "#00AA00", 
     "#00AA00",
+    "#AAAA00",
     "#0000AA",
     "#AA00AA",
     "#00AAAA",
     "#AAAAAA",
-    "#00AAAA",
-    "#FF5555", // bright 8 color
+    "#555555", // bright 8 color
+    "#FF5555",
     "#55FF55",
     "#FFFF55",
     "#5555FF",
     "#FF55FF",
-    "#55FFFF",
+    "#5555FF",
     "#FFFFFF"
     ];
 
