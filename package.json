@@ -1,0 +1,21 @@
+{
+  "name": "webterm",
+  "version": "0.0.0",
+  "description": "xterm emulator in javascript",
+  "main": "main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/boardwalk/webterm"
+  },
+  "author": "Dan Skorupski <dan.skorupski@gmail.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/boardwalk/webterm/issues"
+  },
+  "homepage": "https://github.com/boardwalk/webterm",
+  "dependencies": {
+    "ws": "^0.4.31",
+    "express": "^3.5.1",
+    "pty.js": "^0.2.4"
+  }
+}
