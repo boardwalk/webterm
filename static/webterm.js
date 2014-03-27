@@ -48,7 +48,7 @@ function dump(text, i) {
         break;
       var code = text.charCodeAt(i + j);
       var codeStr = code.toString(16);
-      if(codeStr.length == 1) codeStr = "0" + codeStr;
+      if(codeStr.length === 1) codeStr = "0" + codeStr;
       hexPart += codeStr + " ";
       if(code > 31 && code < 127) {
         asciiPart += text[i + j];
@@ -124,7 +124,7 @@ function Terminal(socket) {
     121: "\u001b[21~", // f10
     122: "\u001b[23~", // f11
     123: "\u001b[24~"  // f12
-  }
+  };
 
   function setApplicationCursorKeys(b) {
     if(b) {
@@ -187,14 +187,14 @@ function Terminal(socket) {
 
   // 232-255
   for(var gray = 0; gray < 24; gray++) {
-    var b = toHex(gray * 10 + 8)
+    var b = toHex(gray * 10 + 8);
     var level = ("#" + b + b + b).toString(16);
     colors.push(level);
   }
 
   // reverse variants
   var reverseColors = {};
-  for(i in colors) {
+  for(var i in colors) {
     var intVal = parseInt(colors[i].substr(1), 16);
     var red = intVal >> 16;
     var green = (intVal >> 8) & 0xFF;
@@ -256,7 +256,7 @@ function Terminal(socket) {
   }
 
   var lazyScroll = debounce(function() {
-    if(lazyScrollCount != 0) {
+    if(lazyScrollCount !== 0) {
       bufferCtx.drawImage(canvas, 0, 0);
       var regionStart = scrollTop * charHeight;
       var firstChunkHeight = lazyScrollCount * charHeight;
@@ -373,7 +373,7 @@ function Terminal(socket) {
    * Escape sequences
    **********************************************/
   function getInt(args, i) {
-    if(args && args.length != 0) {
+    if(args && args.length !== 0) {
       i = parseInt(args);
       if(isNaN(i)) throw "Invalid integer format";
       if(i < 0) throw "Negative integer";
@@ -387,17 +387,17 @@ function Terminal(socket) {
 //    if(type != "m" && type != "H" && type != "A" && type != "B" && type != "C" && type != "D" && type != "h" && type != "l")a
 //    if(type != "m")
 //      console.log(command);
-    if(type == "@") { // ICH -- Insert Character
+    if(type === "@") { // ICH -- Insert Character
       if(!inScrollingRegion()) return;
       var amount = min(getInt(args, 1), numCols - curCol);
       move(curRow, curCol, curRow + 1, numCols, curRow, curCol + amount);
       clear(curRow, curCol, curRow + 1, curCol + amount);
     }
-    else if(type == "m") { // SGR -- Select Graphic Rendition
+    else if(type === "m") { // SGR -- Select Graphic Rendition
       var attribs = [0];
-      if(args.length != 0) {
+      if(args.length !== 0) {
         attribs = args.split(';');
-        for(attribNum in attribs) {
+        for(var attribNum in attribs) {
           attribs[attribNum] = parseInt(attribs[attribNum]);
           if(isNaN(attribs[attribNum])) return;
         }
@@ -410,7 +410,7 @@ function Terminal(socket) {
             displayAttribs.blink = false;
             displayAttribs.reverse = false;
             displayAttribs.hidden = false;
-            displayAttribs.foregroundColor = colors[7]
+            displayAttribs.foregroundColor = colors[7];
             displayAttribs.backgroundColor = colors[0];
             break;
           case 1:
@@ -450,7 +450,7 @@ function Terminal(socket) {
             break;
           case 38:
             var five = attribs[++attribNum];
-            if(five != 5) {
+            if(five !== 5) {
               console.log("five is " + five);
               return;
             }
@@ -471,7 +471,7 @@ function Terminal(socket) {
             break;
           case 48:
             var five = attribs[++attribNum];
-            if(five != 5) {
+            if(five !== 5) {
               console.log("five is " + five);
               return;
             }
@@ -501,98 +501,98 @@ function Terminal(socket) {
         }
       }
     }
-    else if(type == "K") {
-      if(args[0] == "?") { // DECSEL
+    else if(type === "K") {
+      if(args[0] === "?") { // DECSEL
         console.log("Unhandled DECSEL");
       }
       else { // EL -- Erase in Line
         var mode = getInt(args, 0);
-        if(mode == 0)  // clear right
+        if(mode === 0)  // clear right
           clear(curRow, curCol, curRow + 1, numCols);
-        else if(mode == 1)  // clear left
+        else if(mode === 1)  // clear left
           clear(curRow, 0, curRow + 1, curCol + 1);
-        else if(mode == 2) // clear whole line
+        else if(mode === 2) // clear whole line
           clear(curRow, curCol, curRow + 1, numCols);
       }
     }
-    else if(type == "P") { // DCH -- Delete Character
+    else if(type === "P") { // DCH -- Delete Character
       var amount = min(getInt(args, 1), numCols - curCol);
       move(curRow, curCol + amount, curRow + 1, numCols, curRow, curCol);
       clear(curRow, numCols - amount, curRow + 1, numCols);
     }
-    else if(type == "A") { // CUU -- CUrsor Up
+    else if(type === "A") { // CUU -- CUrsor Up
       curRow = max(curRow - getInt(args, 1), 0);
     }
-    else if(type == "B") { // CUD -- CUrsor Down
+    else if(type === "B") { // CUD -- CUrsor Down
       curRow = min(curRow + getInt(args, 1), numRows - 1);
     }
-    else if(type == "C") { // CUF -- CUrsor Forward
+    else if(type === "C") { // CUF -- CUrsor Forward
       curCol = min(curCol + getInt(args, 1), numCols - 1);
     }
-    else if(type == "D") { // CUB -- CUrsor Back
+    else if(type === "D") { // CUB -- CUrsor Back
       curCol = max(curCol - getInt(args, 1), 0);
     }
-    else if(type == "E") { // CNL -- Cursor Next Line
+    else if(type === "E") { // CNL -- Cursor Next Line
       curRow = min(curRow + getInt(args, 1), numRows - 1);
       curCol = 0;
     }
-    else if(type == "F") { // CPL -- Cursor Previous Line
+    else if(type === "F") { // CPL -- Cursor Previous Line
       curRow = max(curRow - getInt(args, 1), 0);
       curCol = 0;
     }
-    else if(type == "G") { // CHA -- Cursor Horizontal Absolute
+    else if(type === "G") { // CHA -- Cursor Horizontal Absolute
       curCol = clamp(getInt(args, 1), 1, numCols) - 1;
     }
-    else if(type == "H") { // CUP -- Cursor Position
+    else if(type === "H") { // CUP -- Cursor Position
       var coords = args.split(";");
       curRow = clamp(getInt(coords[0], 1), 1, numRows) - 1;
       curCol = clamp(getInt(coords[1], 1), 1, numCols) - 1;
     }
-    else if(type == "J") { // ED -- Erase in Display
+    else if(type === "J") { // ED -- Erase in Display
       var mode = getInt(args, 0);
-      if(mode == 0) { // below
+      if(mode === 0) { // below
         clear(curRow, curCol, curRow + 1, numCols); // current line
         if(curRow + 1 < numRows)
           clear(curRow + 1, 0, numRows, numCols); // everything below
       }
-      else if(mode == 1) { // above
+      else if(mode === 1) { // above
         clear(curRow, 0, curRow + 1, numCols); // current line
         if(curRow > 0)
           clear(0, 0, curRow, numCols); // everything above
       }
-      else if(mode == 2) { // all
+      else if(mode === 2) { // all
         clear(0, 0, numRows, numCols);
       }
       else {
         console.log("Unknown ED mode " + mode);
       }
     }
-    else if(type == "L") { // IL -- Insert Line
+    else if(type === "L") { // IL -- Insert Line
       // TODO LOOK AT ME
       var amount = getInt(args, 1);
       move(curRow, 0, scrollBottom - amount, numCols, curRow + amount, 0);
       clear(curRow, 0, curRow + amount, numCols);
     }
-    else if(type == "M") { // DL -- Delete Line
+    else if(type === "M") { // DL -- Delete Line
       // TODO LOOK AT ME
       var amount = getInt(args, 1);
       move(curRow + amount, 0, scrollBottom, numCols, curRow, 0);
       clear(scrollBottom - amount, 0, scrollBottom, numCols);
     }
-    else if(type == "S") { // SU -- Scroll Up
+    else if(type === "S") { // SU -- Scroll Up
       scrollUp(getInt(args, 1));
     }
-    else if(type == "T") { // SD -- Scroll Down
+    else if(type === "T") { // SD -- Scroll Down
       scrollDown(getInt(args, 1));
     }
-    else if(type == "c") { // DA -- Device attributes
-      if(args[0] == ">") {
+    else if(type === "c") { // DA -- Device attributes
+      if(args[0] === ">") {
         // Used by PuTTy. Latest xterm is 271. It causes vim to send funky stuff
         // I don't feel like dealing with right now.
         _this.send("\u001b[>0;136;0c");
       }
       else {
-        if(getInt(args, 0) == 0) {
+        if(getInt(args, 0) === 0) {
           _this.send("\u001b[?1;2c"); // "VT101 with Advanced Video Option"
         }
         else {
@@ -600,29 +600,29 @@ function Terminal(socket) {
         }
       }
     }
-    else if(type == "n") { // DSR -- Device Report Status
+    else if(type === "n") { // DSR -- Device Report Status
       if(args[0] == "5") { // status report
         _this.send("\u001b[0n"); // SR -- Status Report
       }
-      else if(args[0] == "6") { // CPR -- Cursor Position Report
+      else if(args[0] === "6") { // CPR -- Cursor Position Report
         _this.send("\u001b[" + curRow + ";" + curCol + "R");
       }
       else {
         console.log("Unknown DSR " + args[0]);
       }
     }
-    else if(type == "d") { // VPA -- Vertical Position Absolute
+    else if(type === "d") { // VPA -- Vertical Position Absolute
       curRow = clamp(getInt(args, 1), 1, numRows) - 1;
     }
-    else if(type == "h") {
-      if(args[0] == "?") { // DECSET
+    else if(type === "h") {
+      if(args[0] === "?") { // DECSET
         //    1 application cursor keys
         //   12 blinking cursor
         //   25 show cursor
         // 1034 set 8 bit input
         // 1049 alternate screen buffer
         args = args.substr(1).split(";");
-        for(argNum in args) {
+        for(var argNum in args) {
           var mode = parseInt(args[argNum]);
           if(isNaN(mode)) return;
           decModes[mode] = true;
@@ -639,7 +639,7 @@ function Terminal(socket) {
       }
       else { // SM
         args = args.split(";");
-        for(argNum in args) {
+        for(var argNum in args) {
           var mode = parseInt(args[argNum]);
           if(isNaN(mode)) return;
           regModes[mode] = true;
@@ -647,17 +647,17 @@ function Terminal(socket) {
         }
       }
     }
-    else if(type == "l") {
-      if(args[0] == "?") { // DECRST
+    else if(type === "l") {
+      if(args[0] === "?") { // DECRST
         args = args.substr(1).split(";");
-        for(argNum in args) {
+        for(var argNum in args) {
           var mode = parseInt(args[argNum]);
           if(isNaN(mode)) return;
           delete decModes[mode];
-          if(mode == 1) {
+          if(mode === 1) {
             setApplicationCursorKeys(false);
           }
-          else if(mode == 1049) {
+          else if(mode === 1049) {
             if(originalScreen)
               ctx.putImageData(originalScreen, 0, 0);
             curRow = originalCurRow;
@@ -669,7 +669,7 @@ function Terminal(socket) {
       }
       else { // RM
         args.args.split(";");
-        for(argNum in args) {
+        for(var argNum in args) {
           var mode = parseInt(arg[argNum]);
           if(isNaN(mode)) return;
           delete regModes[mode];
@@ -677,7 +677,7 @@ function Terminal(socket) {
         }
       }
     }
-    else if(type == "r") { // DECSTBM
+    else if(type === "r") { // DECSTBM
       lazyScroll(true); // Important!
       curRow = 0;
       curCol = 0;
@@ -694,39 +694,39 @@ function Terminal(socket) {
 
   function osc(command) {
     var args = command.split(";", 2);
-    if(args[0] == "0") {
-      if(args.length == 2)
+    if(args[0] === "0") {
+      if(args.length === 2)
         document.title = args[1];
     }
-    else if(args[0] == "2") {
-      if(args.length == 2)
+    else if(args[0] === "2") {
+      if(args.length === 2)
         document.title = args[1];
     }
-    else if(args[0] == "110") {
+    else if(args[0] === "110") {
       console.log("Reset VT100 text foreground color");
     }
-    else if(args[0] == "111") {
+    else if(args[0] === "111") {
       console.log("Reset VT100 text background color");
     }
-    else if(args[0] == "112") { // reset text cursor color
+    else if(args[0] === "112") { // reset text cursor color
       console.log("Reset text cursor color");
     }
-    else if(args[0] == "113") {
+    else if(args[0] === "113") {
       console.log("Reset mouse foreground color");
     }
-    else if(args[0] == "114") {
+    else if(args[0] === "114") {
       console.log("Reset mouse background color");
     }
-    else if(args[0] == "115") {
+    else if(args[0] === "115") {
       console.log("Reset Tektronix foreground color");
     }
-    else if(args[0] == "116") {
+    else if(args[0] === "116") {
       console.log("Reset Tektronix background color");
     }
-    else if(args[0] == "117") {
+    else if(args[0] === "117") {
       console.log("Reset highlight color");
     }
-    else if(args[0] == "118") {
+    else if(args[0] === "118") {
       console.log("Reset Tektronix cursor color");
     }
     else {
@@ -738,39 +738,39 @@ function Terminal(socket) {
     if(textIndex >= text.length)
       return;
 
-    if(text[textIndex] == "=") {
+    if(text[textIndex] === "=") {
       console.log("Application keypad");
       return textIndex + 1;
     }
 
-    if(text[textIndex] == ">") {
+    if(text[textIndex] === ">") {
       console.log("Normal keypad");
       return textIndex + 1;
     }
 
-    if(text[textIndex] == "M") { // Reverse Index
+    if(text[textIndex] === "M") { // Reverse Index
       scrollDown(1);
       return textIndex + 1;
     }
 
-    if(text[textIndex] == "(") {
+    if(text[textIndex] === "(") {
       // Change character set -- we don't really care.
       return textIndex + 2;
     }
 
-    if(text[textIndex] == "7") {
+    if(text[textIndex] === "7") {
       savedCurRow = curRow;
       savedCurCol = curCol;
       return textIndex + 1;
     }
 
-    if(text[textIndex] == "8") {
+    if(text[textIndex] === "8") {
       curRow = savedCurRow;
       curCol = savedCurCol;
       return textIndex + 1;
     }
 
-    if(text[textIndex] == "]") { // OSC -- Operating System Controls
+    if(text[textIndex] === "]") { // OSC -- Operating System Controls
       textIndex++;
       var commandLen = text.indexOf("\u0007", textIndex) - textIndex;
       if(commandLen < 0)
@@ -779,7 +779,7 @@ function Terminal(socket) {
       return textIndex + commandLen;
     }
 
-    if(text[textIndex] == "[") { // CSI -- Control Sequence Introducer
+    if(text[textIndex] === "[") { // CSI -- Control Sequence Introducer
       textIndex++;
       var commandLen = text.substr(textIndex).search(sequenceEnd);
       if(commandLen < 0)
@@ -803,7 +803,7 @@ function Terminal(socket) {
 
     while(index < textBuffer.length) {
       var ch = textBuffer[index++];
-      if(ch == "\u001B") { // escape
+      if(ch === "\u001B") { // escape
         var newIndex = escape_(textBuffer, index);
         if(newIndex < 0) {
           index--; // unconsume escape!
@@ -811,25 +811,25 @@ function Terminal(socket) {
         }
         index = newIndex;
       }
-      else if(ch == "\r") { // carriage return
+      else if(ch === "\r") { // carriage return
         curCol = 0;
       }
-      else if(ch == "\n") { // newline
+      else if(ch === "\n") { // newline
         curRow++;
         scroll();
       }
-      else if(ch == "\u0007") { // bell
+      else if(ch === "\u0007") { // bell
         // Change window title?
       }
-      else if(ch == "\u0008") { // backspace
+      else if(ch === "\u0008") { // backspace
         if(curCol > 0)
           curCol--;
       }
-      else if(ch == "\u0009") { // tab
+      else if(ch === "\u0009") { // tab
         curCol = min(curCol + (8 - curCol % 8), numCols - 1);
       }
       else {
-        if(curCol == numCols) {
+        if(curCol === numCols) {
           curCol = 0;
           curRow++;
           scroll();
@@ -863,13 +863,13 @@ function Terminal(socket) {
     if(!decModes[1000] && !decModes[1002])
       return false;
     var b = 32;
-    if(e.button == 0)
+    if(e.button === 0)
       b += 0;
-    else if(e.button == 1)
+    else if(e.button === 1)
       b += 1;
-    else if(e.button == 2)
+    else if(e.button === 2)
       b += 2;
-    if(e.type == "mouseup")
+    if(e.type === "mouseup")
       b += 3;
     sendMouseEvent(b, e);
     return true;
@@ -901,7 +901,7 @@ function Terminal(socket) {
       _this.send("\u001b" + String.fromCharCode(e.keyCode));
       return false;
     }
-    if(e.ctrlKey && e.keyCode == 32) { // alt-space
+    if(e.ctrlKey && e.keyCode === 32) { // alt-space
       _this.send("\u001b@");
       return false;
     }
