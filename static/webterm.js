@@ -680,8 +680,8 @@ function Terminal() {
       return textIndex + 1;
     }
 
-    if(text[textIndex] == "M") {
-      console.log("Reverse Index");
+    if(text[textIndex] == "M") { // Reverse Index
+      scrollDown(1);
       return textIndex + 1;
     }
 
