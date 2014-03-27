@@ -47,7 +47,9 @@ function dump(text, i) {
       if(i + j >= text.length)
         break;
       var code = text.charCodeAt(i + j);
-      hexPart += code.toString(16) + " ";
+      var codeStr = code.toString(16);
+      if(codeStr.length == 1) codeStr = "0" + codeStr;
+      hexPart += codeStr + " ";
       if(code > 31 && code < 127) {
         asciiPart += text[i + j];
       }
@@ -203,6 +205,7 @@ function Terminal() {
   /**********************************************
    * Terminal state
    **********************************************/
+  var textBuffer = "";
   var curCol = 0;
   var curRow = 0;
   var lazyScrollCount = 0;
@@ -696,31 +699,31 @@ function Terminal() {
         document.title = args[1];
     }
     else if(args[0] == "110") {
-      console.log("reset vt100 text foreground color");
+      console.log("Reset VT100 text foreground color");
     }
     else if(args[0] == "111") {
-      console.log("reset vt100 text background color");
+      console.log("Reset VT100 text background color");
     }
     else if(args[0] == "112") { // reset text cursor color
-      console.log("reset text cursor color");
+      console.log("Reset text cursor color");
     }
     else if(args[0] == "113") {
-      console.log("reset mouse foreground color");
+      console.log("Reset mouse foreground color");
     }
     else if(args[0] == "114") {
-      console.log("reset mouse background color");
+      console.log("Reset mouse background color");
     }
     else if(args[0] == "115") {
-      console.log("reset Tektronix foreground color");
+      console.log("Reset Tektronix foreground color");
     }
     else if(args[0] == "116") {
-      console.log("reset Tektronix background color");
+      console.log("Reset Tektronix background color");
     }
     else if(args[0] == "117") {
-      console.log("reset highlight color");
+      console.log("Reset highlight color");
     }
     else if(args[0] == "118") {
-      console.log("reset Tektronix cursor color");
+      console.log("Reset Tektronix cursor color");
     }
     else {
       console.log("unhandled osc: " + args[0]);
@@ -728,16 +731,16 @@ function Terminal() {
   }
 
   function escape_(text, textIndex) {
-
-    //console.log(text);
+    if(textIndex >= text.length)
+      return;
 
     if(text[textIndex] == "=") {
-      //console.log("Application keypad");
+      console.log("Application keypad");
       return textIndex + 1;
     }
 
     if(text[textIndex] == ">") {
-      //console.log("Normal keypad");
+      console.log("Normal keypad");
       return textIndex + 1;
     }
 
@@ -766,39 +769,43 @@ function Terminal() {
     if(text[textIndex] == "]") { // OSC -- Operating System Controls
       textIndex++;
       var commandLen = text.indexOf("\u0007", textIndex) - textIndex;
-      if(commandLen < 0) {
-        console.log("osc sequence unterminated");
-        return textIndex;
-      }
+      if(commandLen < 0)
+        return -1;
       osc(text.substr(textIndex, commandLen));
       return textIndex + commandLen;
     }
 
-    if(text[textIndex] == "[") {
+    if(text[textIndex] == "[") { // CSI -- Control Sequence Introducer
       textIndex++;
       var commandLen = text.substr(textIndex).search(sequenceEnd);
-      if(commandLen < 0) {
-        console.log("csi sequence unterminated");
-        return textIndex;
-      }
+      if(commandLen < 0)
+        return -1;
       commandLen++;
       csi(text.substr(textIndex, commandLen));
       return textIndex + commandLen;
     }
 
-    console.log("Unhandled escape sequence: " + text.substr(textIndex));
-    return textIndex;
+    console.log("Unhandled escape sequence");
+    dump(text, textIndex);
+    return -1;
   }
 
   this.write = function(text) {
     hideCursor();
     ctx.font = "12px Courier New";
 
-    var i = 0;
-    while(i < text.length) {
-      var ch = text[i++];
+    textBuffer += text;
+    var index = 0;
+
+    while(index < textBuffer.length) {
+      var ch = textBuffer[index++];
       if(ch == "\u001B") { // escape
-        i = escape_(text, i);
+        var newIndex = escape_(textBuffer, index);
+        if(newIndex < 0) {
+          index--; // unconsume escape!
+          break;
+        }
+        index = newIndex;
       }
       else if(ch == "\r") { // carriage return
         curCol = 0;
@@ -829,6 +836,9 @@ function Terminal() {
         curCol++;
       }
     }
+
+    textBuffer = textBuffer.substr(index);
+
     showCursor();
   } // write()
 
