@@ -214,7 +214,7 @@ function Terminal() {
   var regModes = {};
   var decModes = {
     25: true // Show cursor on by default
-  }
+  };
 
   // Set by SGR
   var displayAttribs = {
@@ -840,7 +840,7 @@ function Terminal() {
     textBuffer = textBuffer.substr(index);
 
     showCursor();
-  } // write()
+  }; // write()
 
   function sendMouseEvent(b, e) {
     if(e.shiftKey)
@@ -904,9 +904,9 @@ function Terminal() {
     return true;
   };
 
-  canvas.onmousedown = function(e) { return sendMouseButtonEvent(e); }
-  canvas.onmouseup = function(e) { return sendMouseButtonEvent(e); }
-  canvas.onmousewheel = function(e) { return sendMouseWheelEvent(e); }
+  canvas.onmousedown = function(e) { return sendMouseButtonEvent(e); };
+  canvas.onmouseup = function(e) { return sendMouseButtonEvent(e); };
+  canvas.onmousewheel = function(e) { return sendMouseWheelEvent(e); };
 }
 
 var term = new Terminal();
