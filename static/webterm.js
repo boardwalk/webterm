@@ -746,22 +746,15 @@ function Terminal() {
         curCol = min(curCol + (8 - curCol % 8), numCols - 1);
       }
       else {
-        var code = ch.charCodeAt(0);
-        //console.log("char [" + ch + "] code [" + code + "]");
-        if(code < 32 || code > 126) {
-          console.log("Unknown character code: " + code);
+        if(curCol == numCols) {
+          curCol = 0;
+          curRow++;
+          scroll();
         }
-        else {
-          if(curCol == numCols) {
-            curCol = 0;
-            curRow++;
-            scroll();
-          }
 
-          render(ch);
+        render(ch);
 
-          curCol++;
-        }
+        curCol++;
       }
     }
     showCursor();
@@ -836,7 +829,7 @@ function Terminal() {
 
 var term = new Terminal();
 
-var socket = new WebSocket("wss://risk:3000/terminal");
+var socket = new WebSocket("ws://localhost:8081");
 socket.onopen = function() {
   term.write("\u001B[2J"); // ED 2 (clear everything)
 };
