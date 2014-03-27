@@ -66,7 +66,8 @@ function dump(text, i) {
   }
 }
 
-function Terminal() {
+function Terminal(socket) {
+  var _this = this;
   var canvas = document.getElementById("terminal");
   var ctx = canvas.getContext("2d");
   var buffer = document.createElement("canvas");
@@ -81,6 +82,10 @@ function Terminal() {
   var scrollTop = 0;
   var scrollBottom = 0;
 
+  this.send = function(message) {
+    socket.send("m" + message);
+  };
+
   this.setSize = function(cols, rows) {
     numCols = cols;
     numRows = rows;
@@ -90,9 +95,8 @@ function Terminal() {
     canvas.height = charHeight * rows;
     buffer.width = charWidth * cols;
     buffer.height = charHeight * rows;
-  }
-
-  this.setSize(80,  24);
+    socket.send("r" + cols + "," + rows);
+  };
 
   var sequenceEnd = /[a-zA-Z@]/;
 
@@ -585,11 +589,11 @@ function Terminal() {
       if(args[0] == ">") {
         // Used by PuTTy. Latest xterm is 271. It causes vim to send funky stuff
         // I don't feel like dealing with right now.
-        socket.send("\u001b[>0;136;0c");
+        _this.send("\u001b[>0;136;0c");
       }
       else {
         if(getInt(args, 0) == 0) {
-          socket.send("\u001b[?1;2c"); // "VT101 with Advanced Video Option"
+          _this.send("\u001b[?1;2c"); // "VT101 with Advanced Video Option"
         }
         else {
           console.log("Unknown primary device attributes arguments");
@@ -598,10 +602,10 @@ function Terminal() {
     }
     else if(type == "n") { // DSR -- Device Report Status
       if(args[0] == "5") { // status report
-        socket.send("\u001b[0n"); // SR -- Status Report
+        _this.send("\u001b[0n"); // SR -- Status Report
       }
       else if(args[0] == "6") { // CPR -- Cursor Position Report
-        socket.send("\u001b[" + curRow + ";" + curCol + "R");
+        _this.send("\u001b[" + curRow + ";" + curCol + "R");
       }
       else {
         console.log("Unknown DSR " + args[0]);
@@ -851,7 +855,7 @@ function Terminal() {
       b += 16;
     var r = 32 + Math.floor(e.offsetY / charHeight) + 1;
     var c = 32 + Math.floor(e.offsetX / charWidth) + 1;
-    socket.send("\u001b[M" + String.fromCharCode(b) + String.fromCharCode(c) + String.fromCharCode(r));
+    _this.send("\u001b[M" + String.fromCharCode(b) + String.fromCharCode(c) + String.fromCharCode(r));
   }
 
   function sendMouseButtonEvent(e) {
@@ -886,19 +890,19 @@ function Terminal() {
   this.onKeyDown = function(e) {
     var trans = mappings[e.keyCode];
     if(trans) {
-      socket.send(trans);
+      _this.send(trans);
       return false;
     }
     if(e.ctrlKey && e.keyCode >= 65 && e.keyCode <= 90) { // ctrl-alpha
-      socket.send(String.fromCharCode(e.keyCode - 64));
+      _this.send(String.fromCharCode(e.keyCode - 64));
       return false;
     }
     if(e.altKey && e.keyCode >= 65 && e.keyCode <= 90) { // alt-alpha
-      socket.send("\u001b" + String.fromCharCode(e.keyCode));
+      _this.send("\u001b" + String.fromCharCode(e.keyCode));
       return false;
     }
     if(e.ctrlKey && e.keyCode == 32) { // alt-space
-      socket.send("\u001b@");
+      _this.send("\u001b@");
       return false;
     }
     return true;
@@ -909,22 +913,25 @@ function Terminal() {
   canvas.onmousewheel = function(e) { return sendMouseWheelEvent(e); };
 }
 
-var term = new Terminal();
-
-var socket = new WebSocket("ws://localhost:8081");
-socket.onopen = function() {
-  term.write("\u001B[2J"); // ED 2 (clear everything)
-};
-socket.onmessage = function(e) {
-  term.write(e.data);
-};
-
-document.onkeypress = function(e) {
-  socket.send(String.fromCharCode(e.keyCode));
-  return true;
+function main() {
+  var socket = new WebSocket("ws://localhost:8081");
+  var term = new Terminal(socket);
+  socket.onopen = function() {
+    term.setSize(180, 50);
+    term.write("\u001B[2J"); // ED 2 (clear everything)
+  };
+  socket.onmessage = function(e) {
+    term.write(e.data);
+  };
+  document.onkeypress = function(e) {
+    term.send(String.fromCharCode(e.keyCode));
+    return true;
+  };
+  // We need to catch some keys onkeydown so the browser doesn't handle them
+  document.onkeydown = function(e) {
+    return term.onKeyDown(e);
+  };
 }
 
-// We need to catch some keys onkeydown so the browser doesn't handle them
-
-document.onkeydown = function(e) { return term.onKeyDown(e); };
+main();
 

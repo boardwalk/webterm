@@ -19,7 +19,21 @@ wsServer.on('connection', function(ws) {
 
     ws.on('message', function(message) {
         //console.log('message received from websocket: ' + message);
-        term.write(message);
+        if(message[0] === "m") {
+            term.write(message.substr(1));
+        }
+        else if(message[0] === "r") {
+            var match = /r(\d+),(\d+)/.exec(message);
+            if(match !== null) {
+                term.resize(parseInt(match[1]), parseInt(match[2]));
+            }
+            else {
+                console.log('malformed resize message');
+            }
+        }
+        else {
+            console.log('unknown message type'):
+        }
     });
 
     ws.on('close', function() {
